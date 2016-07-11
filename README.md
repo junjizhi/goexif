@@ -1,6 +1,50 @@
 goexif
 ======
 
+***Updated at July 11th, 2016***
+
+For personal use, export Exif all fields data via `Main` attribute in:
+
+``` go
+type Exif struct {
+	Tiff *tiff.Tiff
+	Main map[FieldName]*tiff.Tag
+	Raw  []byte
+}
+```
+
+So I may walk through all fields like below:
+
+```go
+package main
+
+import (
+	"log"
+	"os"
+	"github.com/rwcarlsen/goexif/exif"
+)
+
+func ExampleDecode() {
+	fname := "sample1.jpg"
+
+	f, err := os.Open(fname)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	x, err := exif.Decode(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for key, value := range x.Main {
+		log.Println("Field:", key, ", value:", value )
+	}
+}
+```
+
+---
+
 Provides decoding of basic exif and tiff encoded data. Still in alpha - no guarantees.
 Suggestions and pull requests are welcome.  Functionality is split into two packages - "exif" and "tiff"
 The exif package depends on the tiff package. 
@@ -66,6 +110,3 @@ func ExampleDecode() {
 	fmt.Println("lat, long: ", lat, ", ", long)
 }
 ```
-
-<!--golang-->
-[![githalytics.com alpha](https://cruel-carlota.pagodabox.com/5e166f74cdb82b999ccd84e3c4dc4348 "githalytics.com")](http://githalytics.com/rwcarlsen/goexif)
