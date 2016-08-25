@@ -1,5 +1,27 @@
 goexif
 ======
+***Updated at August 25, 2016***
+
+Another example:
+```
+func parse_file(fname string) {
+	f, err := os.Open(fname)
+	if err != nil {
+		fmt.Println("failed to open file: %s", err.Error())
+	}
+
+	x, err := goexif.Decode(f)
+	for tag, _ := range x.Main {
+		value, err := x.Get(tag)
+		if err == nil {
+			str := value.String()
+			fmt.Printf("%s:%s\n", tag, str)
+		} else {
+			fmt.Printf("Error parsing tag: %s\n", tag)
+		}
+	}
+}
+```
 
 ***Updated at July 11th, 2016***
 
