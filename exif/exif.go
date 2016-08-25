@@ -27,6 +27,24 @@ const (
 	interopPointer = 0xA005
 )
 
+// A decodeError is returned when the image cannot be decoded as a tiff image.
+type decodeError struct {
+	cause error
+}
+
+func (de decodeError) Error() string {
+	return fmt.Sprintf("exif: decode failed (%v) ", de.cause.Error())
+}
+
+// IsShortReadTagValueError identifies a ErrShortReadTagValue error.
+func IsShortReadTagValueError(err error) bool {
+	de, ok := err.(decodeError)
+	if ok {
+		return de.cause == tiff.ErrShortReadTagValue
+	}
+	return false
+}
+
 // A TagNotPresentError is returned when the requested field is not
 // present in the EXIF.
 type TagNotPresentError FieldName
@@ -179,7 +197,7 @@ func loadSubDir(x *Exif, ptr FieldName, fieldMap map[uint16]FieldName) error {
 // Exif provides access to decoded EXIF metadata fields and values.
 type Exif struct {
 	Tiff *tiff.Tiff
-	main map[FieldName]*tiff.Tag
+	Main map[FieldName]*tiff.Tag
 	Raw  []byte
 }
 
@@ -249,18 +267,18 @@ func Decode(r io.Reader) (*Exif, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("exif: decode failed (%v) ", err)
+		return nil, decodeError{cause: err}
 	}
 
 	er.Seek(0, 0)
 	raw, err := ioutil.ReadAll(er)
 	if err != nil {
-		return nil, fmt.Errorf("exif: decode failed (%v) ", err)
+		return nil, decodeError{cause: err}
 	}
 
 	// build an exif structure from the tiff
 	x := &Exif{
-		main: map[FieldName]*tiff.Tag{},
+		Main: map[FieldName]*tiff.Tag{},
 		Tiff: tif,
 		Raw:  raw,
 	}
@@ -293,7 +311,7 @@ func (x *Exif) LoadTags(d *tiff.Dir, fieldMap map[uint16]FieldName, showMissing 
 			}
 			name = FieldName(fmt.Sprintf("%v%x", UnknownPrefix, tag.Id))
 		}
-		x.main[name] = tag
+		x.Main[name] = tag
 	}
 }
 
@@ -302,7 +320,7 @@ func (x *Exif) LoadTags(d *tiff.Dir, fieldMap map[uint16]FieldName, showMissing 
 // If the tag is not known or not present, an error is returned. If the
 // tag name is known, the error will be a TagNotPresentError.
 func (x *Exif) Get(name FieldName) (*tiff.Tag, error) {
-	if tg, ok := x.main[name]; ok {
+	if tg, ok := x.Main[name]; ok {
 		return tg, nil
 	}
 	return nil, TagNotPresentError(name)
@@ -318,7 +336,7 @@ type Walker interface {
 // Walk calls the Walk method of w with the name and tag for every non-nil
 // EXIF field.  If w aborts the walk with an error, that error is returned.
 func (x *Exif) Walk(w Walker) error {
-	for name, tag := range x.main {
+	for name, tag := range x.Main {
 		if err := w.Walk(name, tag); err != nil {
 			return err
 		}
@@ -495,7 +513,7 @@ func (x *Exif) LatLong() (lat, long float64, err error) {
 // String returns a pretty text representation of the decoded exif data.
 func (x *Exif) String() string {
 	var buf bytes.Buffer
-	for name, tag := range x.main {
+	for name, tag := range x.Main {
 		fmt.Fprintf(&buf, "%s: %s\n", name, tag)
 	}
 	return buf.String()
@@ -528,7 +546,7 @@ func (x *Exif) JpegThumbnail() ([]byte, error) {
 // MarshalJson implements the encoding/json.Marshaler interface providing output of
 // all EXIF fields present (names and values).
 func (x Exif) MarshalJSON() ([]byte, error) {
-	return json.Marshal(x.main)
+	return json.Marshal(x.Main)
 }
 
 type appSec struct {
@@ -555,11 +573,15 @@ func newAppSec(marker byte, r io.Reader) (*appSec, error) {
 			continue
 		}
 
-		dataLenBytes, err := br.Peek(2)
-		if err != nil {
-			return nil, err
+		dataLenBytes := make([]byte, 2)
+		for k, _ := range dataLenBytes {
+			c, err := br.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			dataLenBytes[k] = c
 		}
-		dataLen = int(binary.BigEndian.Uint16(dataLenBytes))
+		dataLen = int(binary.BigEndian.Uint16(dataLenBytes)) - 2
 	}
 
 	// read section data
@@ -573,7 +595,6 @@ func newAppSec(marker byte, r io.Reader) (*appSec, error) {
 		}
 		app.data = append(app.data, s[:n]...)
 	}
-	app.data = app.data[2:] // exclude dataLenBytes
 	return app, nil
 }
 
