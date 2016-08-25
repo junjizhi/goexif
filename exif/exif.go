@@ -197,7 +197,7 @@ func loadSubDir(x *Exif, ptr FieldName, fieldMap map[uint16]FieldName) error {
 // Exif provides access to decoded EXIF metadata fields and values.
 type Exif struct {
 	Tiff *tiff.Tiff
-	main map[FieldName]*tiff.Tag
+	Main map[FieldName]*tiff.Tag
 	Raw  []byte
 }
 
@@ -278,7 +278,7 @@ func Decode(r io.Reader) (*Exif, error) {
 
 	// build an exif structure from the tiff
 	x := &Exif{
-		main: map[FieldName]*tiff.Tag{},
+		Main: map[FieldName]*tiff.Tag{},
 		Tiff: tif,
 		Raw:  raw,
 	}
@@ -311,7 +311,7 @@ func (x *Exif) LoadTags(d *tiff.Dir, fieldMap map[uint16]FieldName, showMissing 
 			}
 			name = FieldName(fmt.Sprintf("%v%x", UnknownPrefix, tag.Id))
 		}
-		x.main[name] = tag
+		x.Main[name] = tag
 	}
 }
 
@@ -320,7 +320,7 @@ func (x *Exif) LoadTags(d *tiff.Dir, fieldMap map[uint16]FieldName, showMissing 
 // If the tag is not known or not present, an error is returned. If the
 // tag name is known, the error will be a TagNotPresentError.
 func (x *Exif) Get(name FieldName) (*tiff.Tag, error) {
-	if tg, ok := x.main[name]; ok {
+	if tg, ok := x.Main[name]; ok {
 		return tg, nil
 	}
 	return nil, TagNotPresentError(name)
@@ -336,7 +336,7 @@ type Walker interface {
 // Walk calls the Walk method of w with the name and tag for every non-nil
 // EXIF field.  If w aborts the walk with an error, that error is returned.
 func (x *Exif) Walk(w Walker) error {
-	for name, tag := range x.main {
+	for name, tag := range x.Main {
 		if err := w.Walk(name, tag); err != nil {
 			return err
 		}
@@ -513,7 +513,7 @@ func (x *Exif) LatLong() (lat, long float64, err error) {
 // String returns a pretty text representation of the decoded exif data.
 func (x *Exif) String() string {
 	var buf bytes.Buffer
-	for name, tag := range x.main {
+	for name, tag := range x.Main {
 		fmt.Fprintf(&buf, "%s: %s\n", name, tag)
 	}
 	return buf.String()
@@ -546,7 +546,7 @@ func (x *Exif) JpegThumbnail() ([]byte, error) {
 // MarshalJson implements the encoding/json.Marshaler interface providing output of
 // all EXIF fields present (names and values).
 func (x Exif) MarshalJSON() ([]byte, error) {
-	return json.Marshal(x.main)
+	return json.Marshal(x.Main)
 }
 
 type appSec struct {
@@ -574,7 +574,7 @@ func newAppSec(marker byte, r io.Reader) (*appSec, error) {
 		}
 
 		dataLenBytes := make([]byte, 2)
-		for k,_ := range dataLenBytes {
+		for k, _ := range dataLenBytes {
 			c, err := br.ReadByte()
 			if err != nil {
 				return nil, err
